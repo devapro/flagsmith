@@ -263,9 +263,24 @@ class SDKTraits(mixins.CreateModelMixin, viewsets.GenericViewSet):
             if delete_filter_query:
                 Trait.objects.filter(delete_filter_query).delete()
 
-            serializer = self.get_serializer(data=traits, many=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+            # check if any of the traits already exist and remove them from the list
+            # to avoid redundant updates
+            find_filter_query = Q()
+            for trait in traits:
+                find_filter_query = find_filter_query | Q(
+                    trait_key=trait.get("trait_key"),
+                    identity__identifier=trait["identity"]["identifier"],
+                    identity__environment=request.environment,
+                )
+            Trait.objects.filter(find_filter_query)
+
+            for trait_key in Trait.objects.filter(find_filter_query).values_list("trait_key", flat=True).distinct():
+                traits.remove(trait_key)
+
+            if len(traits) > 0:
+                serializer = self.get_serializer(data=traits, many=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
 
             if settings.EDGE_API_URL and request.environment.project.enable_dynamo_db:
                 forward_trait_requests.delay(
