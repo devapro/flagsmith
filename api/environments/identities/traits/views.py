@@ -272,10 +272,17 @@ class SDKTraits(mixins.CreateModelMixin, viewsets.GenericViewSet):
                     identity__identifier=trait["identity"]["identifier"],
                     identity__environment=request.environment,
                 )
-            Trait.objects.filter(find_filter_query)
 
-            for trait_key in Trait.objects.filter(find_filter_query).values_list("trait_key", flat=True).distinct():
-                traits.remove(trait_key)
+            for trait in Trait.objects.filter(find_filter_query).distinct():
+                if (
+                        traits[trait.trait_key].trait_value == trait.trait_value
+                        and traits[trait.trait_key].value_type == trait.value_type
+                        and traits[trait.trait_key].integer_value == trait.integer_value
+                        and traits[trait.trait_key].float_value == trait.float_value
+                        and traits[trait.trait_key].boolean_value == trait.boolean_value
+                        and traits[trait.trait_key].string_value == trait.string_value
+                ):
+                    traits.remove(trait.trait_key)
 
             if len(traits) > 0:
                 serializer = self.get_serializer(data=traits, many=True)
